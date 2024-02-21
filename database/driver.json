@@ -1,0 +1,20 @@
+ [
+      {
+        "id" : 1 ,
+        "email": "chauffeur1@example.com",
+        "nom": "John Doe",
+        "status": "active",
+        "date_ajoutee": "2024-02-18",
+        "outils": []
+      },
+      {
+        "id" : 2 ,
+        "email": "chauffeur2@example.com",
+        "nom": "Jane Doe",
+        "status": "inactive",
+        "date_ajoutee": "2024-02-17",
+        "outils": []
+      }
+  ]
+  
+  

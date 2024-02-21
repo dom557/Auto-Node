@@ -1,0 +1,18 @@
+ [
+      {
+        "nom": "Réservation 1",
+        "destination_de_depart": "City A",
+        "nombre_personnes": 3,
+        "temps_depart": "2024-02-21T09:00:00",
+        "temps_arrive": "2024-02-21T12:00:00"
+      },
+      {
+        "nom": "Réservation 2",
+        "destination_de_depart": "City B",
+        "nombre_personnes": 2,
+        "temps_depart": "2024-02-22T10:00:00",
+        "temps_arrive": "2024-02-22T13:00:00"
+      }
+    ]
+
+  

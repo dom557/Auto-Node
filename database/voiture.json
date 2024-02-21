@@ -1,0 +1,16 @@
+ [
+      {
+        "nom": "Voiture 1",
+        "type": "Sedan",
+        "status": "available",
+        "outils": []
+      },
+      {
+        "nom": "Voiture 2",
+        "type": "SUV",
+        "status": "unavailable",
+        "outils": []
+      }
+    ]
+  
+  
