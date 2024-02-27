@@ -1,55 +1,114 @@
 const express = require('express');
 const router = express.Router();
-const chauffeurs = require('../database/driver.json');
- 
-// Get all chauffeurs
-router.get('/', (req, res) => {
-  res.json(chauffeurs);
+const { MongoClient } = require('mongodb');
+
+const url = "mongodb://localhost:27017";
+const dbname = "Auto";
+
+const client = new MongoClient(url, { useNewUrlParser: true, useUnifiedTopology: true });
+
+let database, collection;
+
+async function connectToMongoDB() {
+    try {
+        await client.connect();
+        console.log("Connected to MongoDB successfully!");
+        database = client.db(dbname);
+        collection = database.collection("drivers");
+    } catch (error) {
+        console.error("Failed to connect to MongoDB server.");
+        console.error(error);
+        throw error;
+    }
+}
+
+// Connect to MongoDB when the application starts
+connectToMongoDB().catch(err => {
+    console.error('Error connecting to MongoDB:', err);
+    process.exit(1);
 });
 
-// Get a single chauffeur by ID
-router.get('/:id', (req, res) => {
-    const id = req.params.id;
-    const chauffeur = chauffeurs.find(driver => driver.id == id);
-    if (chauffeur) {
-      res.json(chauffeur);
-    } else {
-      res.status(404).json({ message: 'Chauffeur not found' });
+// Get all drivers
+router.get('/', async (req, res) => {
+    try {
+        if (!collection) {
+            throw new Error("Collection is not initialized");
+        }
+        let drivers = await collection.find().toArray();
+        res.status(200).json(drivers);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ "error": "Internal server error" });
     }
-  });
-  
-  // Create a new chauffeur
-  router.post('/', (req, res) => {
-    const newDriver = req.body; // Assuming the request body contains the new chauffeur data
-    // Generate a unique ID for the new chauffeur (you may use a library like UUID)
-    chauffeurs.push(newDriver); // Add the new chauffeur to the chauffeurs array
-    res.status(201).json(newDriver); // Return the newly created chauffeur with status code 201 (Created)
-  });
-  
-  // Update an existing chauffeur
-  router.put('/:id', (req, res) => {
-    const id = req.params.id;
-    const updatedDriver = req.body; // Assuming the request body contains the updated chauffeur data
-    const index = chauffeurs.findIndex(driver => driver.id == id); // Find the index of the chauffeur in the array
-    if (index !== -1) {
-      chauffeurs[index] = { ...chauffeurs[index], ...updatedDriver }; // Update the chauffeur with the new data
-      res.json(chauffeurs[index]); // Return the updated chauffeur
-    } else {
-      res.status(404).json({ message: 'Chauffeur not found' }); // If chauffeur with given ID is not found, return 404
+});
+
+// Get a single driver by ID
+router.get('/:id', async (req, res) => {
+    try {
+        let id = parseInt(req.params.id)
+        let driver = await collection.findOne({ id: id })
+        res.status(200).json(driver)
+        }catch (err) {
+        console.log(err)
+        res.status(500).json({ "error": "Internal server error" })
+        }
+});
+
+// Create a new driver
+router.post('/',  async (req, res) => {
+    try {
+        let drivers = await collection.find().toArray();
+        let driver = req.body
+        let listOdIds = drivers.map(usr => usr.id)
+        let maxID = listOdIds.reduce((acc,id) => Math.max(acc,id),-Infinity)
+        driver.id = maxID + 1
+        await collection.insertOne(driver);
+        res.status(200).json(driver);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({ "error": 'Internal server error' });
     }
-  });
-  
-  // Remove a chauffeur
-  router.delete('/:id', (req, res) => {
-    const id = req.params.id;
-    const index = chauffeurs.findIndex(driver => driver.id == id); // Find the index of the chauffeur in the array
-    if (index !== -1) {
-      chauffeurs.splice(index, 1); // Remove the chauffeur from the array
-      res.json({ message: 'Chauffeur removed successfully' }); // Return success message
-    } else {
-      res.status(404).json({ message: 'Chauffeur not found' }); // If chauffeur with given ID is not found, return 404
+})
+
+
+// Update an existing driver
+router.put("/:id",async(req,res)=>{
+    try {
+    let id = parseInt(req.params.id)
+    let driverUpdate = req.body
+    driverUpdate.id = id
+    await collection.replaceOne({ id: id }, driverUpdate)
+    let driver = await collection.find({ id }).toArray()
+    res.status(200).json(driver)
+    } catch (err) {
+    console.log(err)
+    res.status(500).json({ "error": "Internal server error" })
     }
-  });
-  
-  module.exports = router;
-  
+});
+
+// Remove a driver
+router.delete("/:id",async(req,res)=>{
+    try {
+    let id = parseInt(req.params.id)
+    await collection.deleteOne({ id: id })
+    let drivers = await collection.find().toArray()
+    res.status(200).json(drivers)
+    } catch (err) {
+    console.log(err)
+    res.status(500).json({ "error": "Internal server error" })
+    }
+});
+
+// Close MongoDB connection when the application exits
+process.on('SIGINT', async () => {
+    try {
+        await client.close();
+        console.log('MongoDB connection closed.');
+        process.exit(0);
+    } catch (err) {
+        console.error('Error closing MongoDB connection:', err);
+        process.exit(1);
+    }
+});
+
+module.exports = router;

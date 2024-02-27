@@ -1,64 +1,114 @@
-
 const express = require('express');
 const router = express.Router();
-const utilisateurs = require('../database/utilisateur.json');
+const { MongoClient } = require('mongodb');
 
-// Get all utilisateurs
-router.get('/', (req, res) => {
-  res.json(utilisateurs);
-});
+const url = "mongodb://localhost:27017";
+const dbname = "Auto";
 
-// Get a single utilisateur by ID
-router.get('/:id', (req, res) => {
-  const id = req.params.id;
-  const utilisateur = utilisateurs.find(user => user.id === id);
-  if (utilisateur) {
-    res.json(utilisateur);
-  } else {
-    res.status(404).json({ message: 'Utilisateur not found' });
-  }
-});
-// Create a new utilisateur
-router.post('/', (req, res) => {
-    const newUser = req.body; // Assuming the request body contains the new utilisateur data
-    // Generate a unique ID for the new utilisateur (you may use a library like UUID)
-    utilisateurs.push(newUser); // Add the new utilisateur to the utilisateurs array
-    res.status(201).json(newUser); // Return the newly created utilisateur with status code 201 (Created)
-    res.redirect('/joueurs');
+const client = new MongoClient(url, { useNewUrlParser: true, useUnifiedTopology: true });
 
-  });
-  
-// Update an existing utilisateur
-router.put('/:id', (req, res) => {
-  const id = req.params.id;
-  const updatedUser = req.body; // Assuming the request body contains the updated utilisateur data
-  const index = utilisateurs.findIndex(user => user.id == id); // Find the index of the utilisateur in the array
-  
-  if (index !== -1) {
-    // Update the utilisateur with the new data
-    utilisateurs[index].id = updatedUser.id;
-    utilisateurs[index].admin = updatedUser.admin;
-    utilisateurs[index].email = updatedUser.email;
-    utilisateurs[index].status = updatedUser.status;
-    utilisateurs[index].date_ajoutee = updatedUser.date_ajoutee;
-    utilisateurs[index].outils = updatedUser.outils;
-    res.send(utilisateurs[index]);
-  } else {
-    res.status(404).send("Utilisateur not found");
-  }
-});
+let database, collection;
 
-  
-  // Remove an utilisateur
-  router.delete('/:id', (req, res) => {
-    const id = req.params.id;
-    const index = utilisateurs.findIndex(user => user.id == id); // Find the index of the utilisateur in the array
-    if (index !== -1) {
-      utilisateurs.splice(index, 1); // Remove the utilisateur from the array
-      res.json({ message: 'Utilisateur removed successfully' }); // Return success message
-    } else {
-      res.status(404).json({ message: 'Utilisateur not found' }); // If utilisateur with given ID is not found, return 404
+async function connectToMongoDB() {
+    try {
+        await client.connect();
+        console.log("Connected to MongoDB successfully!");
+        database = client.db(dbname);
+        collection = database.collection("user");
+    } catch (error) {
+        console.error("Failed to connect to MongoDB server.");
+        console.error(error);
+        throw error;
     }
-  });
-  
+}
+
+// Connect to MongoDB when the application starts
+connectToMongoDB().catch(err => {
+    console.error('Error connecting to MongoDB:', err);
+    process.exit(1);
+});
+
+// Get all users
+router.get('/', async (req, res) => {
+    try {
+        if (!collection) {
+            throw new Error("Collection is not initialized");
+        }
+        let users = await collection.find().toArray();
+        res.status(200).json(users);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ "error": "Internal server error" });
+    }
+});
+
+// Get a single user by ID
+router.get('/:id', async (req, res) => {
+    try {
+        let id = parseInt(req.params.id)
+        let user = await collection.findOne({ id: id })
+        res.status(200).json(user)
+        }catch (err) {
+        console.log(err)
+        res.status(500).json({ "error": "Internal server error" })
+        }
+});
+
+// Create a new user
+router.post('/',  async (req, res) => {
+    try {
+        let users = await collection.find().toArray();
+        let user = req.body
+        let listOdIds = users.map(usr => usr.id)
+        let maxID = listOdIds.reduce((acc,id) => Math.max(acc,id),-Infinity)
+        user.id = maxID + 1
+        await collection.insertOne(user);
+        res.status(200).json(user);
+    } catch (e) {
+        console.log(e);
+        res.status(500).json({ "error": 'Internal server error' });
+    }
+})
+
+
+// Update an existing user
+router.put("/:id",async(req,res)=>{
+    try {
+    let id = parseInt(req.params.id)
+    let userUpdate = req.body
+    userUpdate.id = id
+    await collection.replaceOne({ id: id }, userUpdate)
+    let user = await collection.find({ id }).toArray()
+    res.status(200).json(user)
+    } catch (err) {
+    console.log(err)
+    res.status(500).json({ "error": "Internal server error" })
+    }
+});
+
+// Remove a user
+router.delete("/:id",async(req,res)=>{
+    try {
+    let id = parseInt(req.params.id)
+    await collection.deleteOne({ id: id })
+    let users = await collection.find().toArray()
+    res.status(200).json(users)
+    } catch (err) {
+    console.log(err)
+    res.status(500).json({ "error": "Internal server error" })
+    }
+});
+
+// Close MongoDB connection when the application exits
+process.on('SIGINT', async () => {
+    try {
+        await client.close();
+        console.log('MongoDB connection closed.');
+        process.exit(0);
+    } catch (err) {
+        console.error('Error closing MongoDB connection:', err);
+        process.exit(1);
+    }
+});
+
 module.exports = router;
